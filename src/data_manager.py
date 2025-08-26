@@ -139,7 +139,7 @@ class DataManager:
 
         # --- MUDANÇA PRINCIPAL ---
         # Limita a lista de navegação a 1000 exames
-        limit = 100 # o normal é 1000, mas para testes vou deixar 100
+        limit = 1000
         if len(self.navigable_folders) > limit:
             print(f"AVISO: Encontrados {len(self.navigable_folders)} exames. Limitando a sessão aos primeiros {limit}.")
             self.navigable_folders = self.navigable_folders[:limit]
