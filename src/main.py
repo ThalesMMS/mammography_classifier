@@ -58,6 +58,7 @@ if __name__ == '__main__':
 
         except SystemExit as e:
             print(f"Aplicação encerrada: {e}")
+            raise
         except FileNotFoundError as e: 
             print(f"Erro de arquivo não encontrado: {e}")
         except KeyboardInterrupt:
