@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import math
+import cProfile, pstats # temporário
 
 from data_manager import DataManager
 from dicom_loader import apply_windowing
@@ -86,6 +87,12 @@ class ImageViewerUI:
 
     def on_key_press(self, event):
         """Manipulador para eventos de pressionamento de tecla (agora sem 'Carregando...')."""
+        
+        # --- INÍCIO DO CÓDIGO DE PROFILING ---
+        profiler = cProfile.Profile()
+        profiler.enable()
+        # ------------------------------------
+        
         if event.key == 'up':
             if self.data_manager.move_to_previous_folder():
                 self.display_current_exam()
@@ -105,6 +112,13 @@ class ImageViewerUI:
                 self.display_message("Fim da lista de exames!")
             else:
                 self.display_current_exam()
+        
+        # --- FIM DO CÓDIGO DE PROFILING ---
+        profiler.disable()
+        print("\n--- ANÁLISE DE PERFORMANCE DO ÚLTIMO CLIQUE ---")
+        stats = pstats.Stats(profiler).sort_stats('tottime') # Ordena pelo tempo gasto DENTRO de cada função
+        stats.print_stats(15) # Mostra as 15 funções mais lentas
+        # ----------------------------------
 
     def show(self):
         """Mostra a janela da aplicação."""
