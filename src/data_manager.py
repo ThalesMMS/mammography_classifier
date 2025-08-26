@@ -2,9 +2,13 @@
 
 import os
 import pandas as pd
+import threading
+import time
 from datetime import datetime
-import numpy as np # Adicionado para anotação de tipo em load_single_exam
-from dicom_loader import load_and_process_dicom
+import multiprocessing
+import sys
+import numpy as np
+from dicom_loader import load_dicom_task
 
 class DataManager:
     def __init__(self, project_root: str):
@@ -19,6 +23,21 @@ class DataManager:
         self.navigable_folders = []
         self.current_folder_index = -1
 
+        try:
+            multiprocessing.set_start_method('spawn', force=True)
+        except RuntimeError:
+            pass
+
+        self.manager = multiprocessing.Manager()
+        self.image_buffer = self.manager.dict()
+        num_workers = max(1, os.cpu_count() - 2)
+        self.pool = multiprocessing.Pool(processes=num_workers)
+        print(f"Pool de {num_workers} processos trabalhadores criada.")
+        
+        self.pending_jobs = {}
+        self.control_thread_stop_event = threading.Event()
+        self.control_thread = threading.Thread(target=self._manage_buffer_jobs, daemon=True)
+
         if not os.path.isdir(self.archive_dir):
             raise FileNotFoundError(f"O diretório 'archive' não foi encontrado em: {self.archive_dir}")
         if not os.path.isfile(self.train_csv_path):
@@ -32,17 +51,50 @@ class DataManager:
         if self.navigable_folders:
             self.current_folder_index = 0
 
-    def load_single_exam(self, accession_number: str) -> np.ndarray | None:
-        """Carrega a primeira imagem de um exame diretamente do disco."""
-        dicom_files = self.get_dicom_files(accession_number)
-        if not dicom_files:
-            return None
-        
-        file_path = os.path.join(self.archive_dir, accession_number, dicom_files[0])
-        return load_and_process_dicom(file_path)
+    def start_loader(self):
+        if not self.control_thread.is_alive():
+            print("Iniciando gerenciador de buffer paralelo...")
+            self.control_thread.start()
+
+    def shutdown_loader(self):
+        print("Encerrando pool de processos...")
+        self.control_thread_stop_event.set()
+        self.control_thread.join(timeout=2)
+        self.pool.close()
+        self.pool.join()
+        self.manager.shutdown()
+
+    def _manage_buffer_jobs(self):
+        while not self.control_thread_stop_event.is_set():
+            if self.current_folder_index < 0:
+                time.sleep(0.1)
+                continue
+
+            buffer_size = 8
+            indices_to_load = {self.current_folder_index + i for i in range(buffer_size) if 0 <= self.current_folder_index + i < len(self.navigable_folders)}
+            accessions_to_load = {self.navigable_folders[i] for i in indices_to_load}
+
+            for acc, job in list(self.pending_jobs.items()):
+                if job.ready():
+                    del self.pending_jobs[acc]
+
+            for accession in accessions_to_load:
+                if accession not in self.image_buffer and accession not in self.pending_jobs:
+                    dicom_files = self.get_dicom_files(accession)
+                    if dicom_files:
+                        file_path = os.path.join(self.archive_dir, accession, dicom_files[0])
+                        job = self.pool.apply_async(load_dicom_task, args=(file_path, accession, self.image_buffer))
+                        self.pending_jobs[accession] = job
+                    else:
+                        self.image_buffer[accession] = None
+
+            for accession in list(self.image_buffer.keys()):
+                if accession not in accessions_to_load and accession not in self.pending_jobs:
+                    del self.image_buffer[accession]
+            
+            time.sleep(0.1)
 
     def _load_train_data(self):
-        """Carrega o arquivo train.csv para identificar pastas válidas."""
         try:
             df = pd.read_csv(self.train_csv_path, dtype={'AccessionNumber': str})
             df.set_index('AccessionNumber', inplace=True)
@@ -52,7 +104,6 @@ class DataManager:
             self.patient_data_df = pd.DataFrame()
 
     def _scan_patient_folders(self):
-        """Verifica o diretório 'archive' para encontrar pastas de pacientes válidas."""
         if self.patient_data_df is None or self.patient_data_df.empty:
             return
         self._all_valid_patient_folders = [
@@ -62,7 +113,6 @@ class DataManager:
         print(f"Encontradas {len(self._all_valid_patient_folders)} pastas de pacientes válidas e com gabarito.")
 
     def _load_classifications(self):
-        """Carrega o arquivo de classificações (classificacao.csv) se ele existir."""
         try:
             self.classifications_df = pd.read_csv(self.classification_csv_path, dtype={'AccessionNumber': str})
             self.classifications_df.set_index('AccessionNumber', inplace=True)
@@ -76,7 +126,6 @@ class DataManager:
             self.classifications_df = pd.DataFrame()
 
     def save_classification(self, accession_number: str, classification: int):
-        """Salva ou atualiza a classificação de um exame e salva no CSV."""
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.classifications_df.loc[accession_number] = {'Classification': classification, 'ClassificationDate': now}
         try:
@@ -86,13 +135,11 @@ class DataManager:
             print(f"ERRO: Não foi possível salvar em '{self.classification_csv_path}': {e}")
 
     def get_classification(self, accession_number: str) -> int | None:
-        """Retorna a classificação de um exame, se existir."""
         if accession_number in self.classifications_df.index:
             return int(self.classifications_df.loc[accession_number, 'Classification'])
         return None
 
     def filter_folders(self, only_unclassified: bool):
-        """Filtra a lista de pastas navegáveis."""
         print("\nAplicando filtros de navegação...")
         self.navigable_folders = list(self._all_valid_patient_folders)
         if only_unclassified:
@@ -102,38 +149,53 @@ class DataManager:
         else:
             print("- Filtro 'Apenas não classificados': Desativado.")
 
-        if self.navigable_folders: self.current_folder_index = 0
-        else: self.current_folder_index = -1
-        print(f"Total de pastas navegáveis: {len(self.navigable_folders)}")
+        limit = 1000
+        if len(self.navigable_folders) > limit:
+            print(f"AVISO: Encontrados {len(self.navigable_folders)} exames. Limitando a sessão aos primeiros {limit}.")
+            self.navigable_folders = self.navigable_folders[:limit]
+
+        if self.navigable_folders:
+            self.current_folder_index = 0
+        else:
+            self.current_folder_index = -1
+        print(f"Total de pastas nesta sessão: {len(self.navigable_folders)}")
 
     def get_dicom_files(self, accession_number: str) -> list:
-        """Retorna a lista de arquivos .dcm para um paciente."""
         folder_path = os.path.join(self.archive_dir, accession_number)
-        if not os.path.isdir(folder_path): return []
+        if not os.path.isdir(folder_path):
+            return []
         return [f for f in sorted(os.listdir(folder_path)) if f.lower().endswith('.dcm')]
 
     def get_current_folder_details(self) -> dict | None:
-        """Retorna detalhes básicos da pasta atual."""
-        if not self.navigable_folders or self.current_folder_index < 0: return None
+        if not self.navigable_folders or self.current_folder_index < 0:
+            return None
         return {"accession_number": self.navigable_folders[self.current_folder_index]}
 
+    def get_exam_data_from_buffer(self, accession_number: str) -> np.ndarray | None:
+        timeout, start_time = 10, time.time()
+        while accession_number not in self.image_buffer:
+            if time.time() - start_time > timeout:
+                print(f"ERRO: Timeout esperando pelo exame '{accession_number}' no buffer.")
+                return None
+            time.sleep(0.05)
+        return self.image_buffer.get(accession_number)
+
     def move_to_next_folder(self) -> bool:
-        """Avança para a próxima pasta na lista navegável."""
-        if not self.navigable_folders or self.current_folder_index >= len(self.navigable_folders) - 1: return False
+        if not self.navigable_folders or self.current_folder_index >= len(self.navigable_folders) - 1:
+            return False
         self.current_folder_index += 1
         return True
 
     def move_to_previous_folder(self) -> bool:
-        """Retorna para a pasta anterior na lista navegável."""
-        if not self.navigable_folders or self.current_folder_index <= 0: return False
+        if not self.navigable_folders or self.current_folder_index <= 0:
+            return False
         self.current_folder_index -= 1
         return True
     
     def get_total_navigable_folders(self) -> int:
-        """Retorna o número total de pastas navegáveis."""
         return len(self.navigable_folders)
 
     def get_current_folder_index_display(self) -> int:
-        """Retorna o índice atual baseado em 1 para exibição."""
-        if self.current_folder_index == -1: return 0
+        if self.current_folder_index == -1:
+            return 0
         return self.current_folder_index + 1

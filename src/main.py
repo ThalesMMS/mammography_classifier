@@ -12,6 +12,7 @@ if __name__ == '__main__':
     archive_path_check = os.path.join(project_root, "archive")
     print(f"Verificando a pasta 'archive' em: {archive_path_check}")
 
+    dm = None 
     if not os.path.isdir(archive_path_check):
         print(f"ERRO: Pasta 'archive' não encontrada em '{archive_path_check}'.")
     else:
@@ -38,9 +39,9 @@ if __name__ == '__main__':
             show_only_unclassified = answer_filter.startswith('s')
             dm.filter_folders(only_unclassified=show_only_unclassified)
             
-            # Apenas inicia a UI. Nenhum pré-carregamento é feito.
             if dm.get_total_navigable_folders() > 0:
-                print("\n--- Iniciando Interface Gráfica (Modo On-Demand) ---")
+                print("\n--- Iniciando Interface Gráfica com Buffer Paralelo ---")
+                dm.start_loader() # Inicia o carregamento em segundo plano
                 viewer_app = ImageViewerUI(data_manager=dm) 
                 viewer_app.show()
             else:
@@ -49,3 +50,7 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Ocorreu um erro inesperado: {e}")
             traceback.print_exc()
+        finally:
+            if dm:
+                print("Encerrando processos de carregamento...")
+                dm.shutdown_loader()

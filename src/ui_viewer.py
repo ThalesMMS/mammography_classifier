@@ -6,7 +6,7 @@ from data_manager import DataManager
 
 class ImageViewerUI:
     def __init__(self, data_manager: DataManager):
-        print("Inicializando UI com OpenCV (Modo On-Demand)...")
+        print("Inicializando UI Otimizada com OpenCV...")
         self.data_manager = data_manager
         self.window_name = 'Ferramenta de Classificacao de Densidade Mamaria'
         
@@ -19,7 +19,7 @@ class ImageViewerUI:
         cv2.resizeWindow(self.window_name, 800, 1000)
 
     def display_current_exam(self):
-        """Busca a imagem sob demanda e a exibe."""
+        """Busca a imagem do buffer e a exibe."""
         details = self.data_manager.get_current_folder_details()
         if not details:
             self.display_message("Fim da lista de exames!")
@@ -27,18 +27,14 @@ class ImageViewerUI:
             return False
 
         accession_number = details["accession_number"]
+        image_array_readonly = self.data_manager.get_exam_data_from_buffer(accession_number)
         
-        # --- MUDANÇA PRINCIPAL ---
-        # Carrega a imagem do disco neste exato momento
-        image_array = self.data_manager.load_single_exam(accession_number)
-        # ---------------------------
-        
-        if image_array is None:
+        if image_array_readonly is None:
             self.display_message(f"Erro ao carregar imagem para:\n{accession_number}")
             cv2.waitKey(2000)
             return True
 
-        image_to_display = cv2.cvtColor(image_array, cv2.COLOR_GRAY2BGR)
+        image_to_display = cv2.cvtColor(image_array_readonly, cv2.COLOR_GRAY2BGR)
         self._draw_text_info(image_to_display, accession_number)
         cv2.imshow(self.window_name, image_to_display)
         return True
