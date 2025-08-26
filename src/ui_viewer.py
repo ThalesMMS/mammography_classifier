@@ -10,7 +10,7 @@ from dicom_loader import apply_windowing
 
 class ImageViewerUI:
     def __init__(self, data_manager: DataManager):
-        print("Inicializando UI de Classificação Simplificada...")
+        print("Inicializando UI de Classificação...")
         self.data_manager = data_manager
 
         self.classification_labels = {
@@ -26,27 +26,22 @@ class ImageViewerUI:
         self.fig.canvas.manager.set_window_title('Ferramenta de Classificação de Densidade Mamária')
 
         self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
-        self.fig.canvas.mpl_connect('close_event', self.on_close)
+        # O 'on_close' não é mais necessário para parar a thread/pool
 
-        self.data_manager.start_loader()
-
+        # A UI só é chamada depois que tudo está na RAM
         if self.data_manager.get_total_navigable_folders() > 0:
             self.display_current_exam()
         else:
             self.display_message("Nenhuma pasta encontrada para os critérios de filtro.")
 
     def display_current_exam(self):
-        """Busca e exibe a primeira imagem do exame atual."""
+        """Busca e exibe a imagem do exame atual (já na RAM)."""
         details = self.data_manager.get_current_folder_details()
         if not details:
-            # Esta verificação agora é feita no on_key_press, mas mantemos por segurança
             self.display_message("Fim da lista de exames.")
             return
 
         accession_number = details["accession_number"]
-        print(f"Exibindo exame: {accession_number}")
-
-        # Esta chamada ainda pode bloquear, mas o usuário já viu o feedback "Carregando..."
         image_data = self.data_manager.get_exam_data_from_buffer(accession_number)
         
         self.fig.clear()
@@ -90,16 +85,12 @@ class ImageViewerUI:
         self.fig.canvas.draw_idle()
 
     def on_key_press(self, event):
-        """Manipulador para eventos de pressionamento de tecla."""
+        """Manipulador para eventos de pressionamento de tecla (agora sem 'Carregando...')."""
         if event.key == 'up':
             if self.data_manager.move_to_previous_folder():
-                self.display_message("Carregando...")
-                self.fig.canvas.flush_events() # Força a UI a redesenhar AGORA
                 self.display_current_exam()
         elif event.key == 'down':
             if self.data_manager.move_to_next_folder():
-                self.display_message("Carregando...")
-                self.fig.canvas.flush_events() # Força a UI a redesenhar AGORA
                 self.display_current_exam()
         elif event.key in ['1', '2', '3', '4', '5']:
             details = self.data_manager.get_current_folder_details()
@@ -108,25 +99,12 @@ class ImageViewerUI:
             accession_number = details["accession_number"]
             classification = int(event.key)
             
-            # 1. Salva (rápido)
             self.data_manager.save_classification(accession_number, classification)
             
-            # 2. Tenta avançar para o próximo exame
             if not self.data_manager.move_to_next_folder():
                 self.display_message("Fim da lista de exames!")
-                return
-            
-            # 3. Exibe feedback IMEDIATO e força o redesenho da UI
-            self.display_message("Carregando...")
-            self.fig.canvas.flush_events() # <<< O PONTO CHAVE DA MUDANÇA
-            
-            # 4. Agora, chama a função que pode demorar um pouco
-            self.display_current_exam()
-
-    def on_close(self, event):
-        """Garante que a thread do buffer seja parada ao fechar a janela."""
-        print("Janela fechada. Encerrando a aplicação...")
-        self.data_manager.shutdown_loader()
+            else:
+                self.display_current_exam()
 
     def show(self):
         """Mostra a janela da aplicação."""
