@@ -68,7 +68,6 @@ class DataManager:
     def _load_train_data(self):
         """Carrega o arquivo train.csv para identificar pastas válidas."""
         try:
-            # Carregamos apenas o necessário para validar as pastas
             df = pd.read_csv(self.train_csv_path, dtype={'AccessionNumber': str})
             df.set_index('AccessionNumber', inplace=True)
             self.patient_data_df = df
@@ -110,10 +109,8 @@ class DataManager:
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         new_data = {'Classification': classification, 'ClassificationDate': now}
         
-        # Atualiza ou adiciona a linha no DataFrame
         self.classifications_df.loc[accession_number] = new_data
         
-        # Salva o DataFrame inteiro de volta no arquivo CSV
         try:
             self.classifications_df.to_csv(self.classification_csv_path)
             print(f"Classificação para {accession_number} salva como '{classification}'.")
@@ -123,7 +120,6 @@ class DataManager:
     def get_classification(self, accession_number: str) -> int | None:
         """Retorna a classificação de um exame, se existir."""
         if accession_number in self.classifications_df.index:
-            # Retorna o valor da coluna 'Classification' como inteiro
             return int(self.classifications_df.loc[accession_number, 'Classification'])
         return None
 
@@ -164,64 +160,48 @@ class DataManager:
             return None
         
         accession_number = self.navigable_folders[self.current_folder_index]
-        return {
-            "accession_number": accession_number,
-            "dicom_files_count": len(self.get_dicom_files(accession_number))
-        }
-
-    # --- MÉTODOS DE PRÉ-CARREGAMENTO (BUFFER) ---
+        return {"accession_number": accession_number}
 
     def _update_buffer(self):
-        """Função executada pela thread para carregar e descarregar imagens do buffer."""
+        """Função da thread para carregar a PRIMEIRA imagem de cada exame no buffer."""
         while not self.buffer_stop_event.is_set():
             if self.current_folder_index < 0:
                 time.sleep(0.5)
                 continue
 
-            # 1. Determinar quais exames devem estar no buffer (atual + 2 próximos)
-            indices_to_load = set()
-            for i in range(3):
-                idx = self.current_folder_index + i
-                if 0 <= idx < len(self.navigable_folders):
-                    indices_to_load.add(idx)
-            
+            indices_to_load = {self.current_folder_index + i for i in range(3) if 0 <= self.current_folder_index + i < len(self.navigable_folders)}
             accessions_to_load = {self.navigable_folders[i] for i in indices_to_load}
 
-            # 2. Carregar exames que ainda não estão no buffer
             for accession in accessions_to_load:
                 if accession not in self.image_buffer:
                     print(f"[Buffer Thread] Carregando exame: {accession}")
                     dicom_files = self.get_dicom_files(accession)
-                    image_data_list = []
-                    for fname in dicom_files:
-                        fpath = os.path.join(self.archive_dir, accession, fname)
-                        pixel_data, view_params = self.dicom_loader.load_dicom_data(fpath)
+                    
+                    image_data = None
+                    if dicom_files:
+                        first_file_path = os.path.join(self.archive_dir, accession, dicom_files[0])
+                        pixel_data, view_params = self.dicom_loader.load_dicom_data(first_file_path)
                         if pixel_data is not None:
-                            image_data_list.append((pixel_data, view_params))
-                    self.image_buffer[accession] = image_data_list
-            
-            # 3. Descarregar exames que não são mais necessários
-            accessions_in_buffer = list(self.image_buffer.keys())
-            for accession in accessions_in_buffer:
+                            image_data = (pixel_data, view_params)
+                    
+                    self.image_buffer[accession] = image_data
+
+            for accession in list(self.image_buffer.keys()):
                 if accession not in accessions_to_load:
                     print(f"[Buffer Thread] Descarregando exame: {accession}")
                     del self.image_buffer[accession]
             
-            time.sleep(0.5) # Pausa para não consumir 100% da CPU
+            time.sleep(0.5)
 
-    def get_exam_data_from_buffer(self, accession_number: str) -> list | None:
-        """Obtém os dados de imagem de um exame do buffer. Pode esperar se não estiver pronto."""
-        # Espera até que o exame esteja no buffer (com um timeout)
-        timeout = 5  # segundos
-        start_time = time.time()
+    def get_exam_data_from_buffer(self, accession_number: str) -> tuple | None:
+        """Obtém os dados da imagem de um exame do buffer."""
+        timeout, start_time = 5, time.time()
         while accession_number not in self.image_buffer:
             if time.time() - start_time > timeout:
                 print(f"ERRO: Timeout esperando pelo exame '{accession_number}' no buffer.")
                 return None
             time.sleep(0.1)
         return self.image_buffer.get(accession_number)
-
-    # --- MÉTODOS DE NAVEGAÇÃO ---
 
     def move_to_next_folder(self) -> bool:
         if not self.navigable_folders or self.current_folder_index >= len(self.navigable_folders) - 1:
