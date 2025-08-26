@@ -149,10 +149,7 @@ class DataManager:
         else:
             print("- Filtro 'Apenas não classificados': Desativado.")
 
-        limit = 1000
-        if len(self.navigable_folders) > limit:
-            print(f"AVISO: Encontrados {len(self.navigable_folders)} exames. Limitando a sessão aos primeiros {limit}.")
-            self.navigable_folders = self.navigable_folders[:limit]
+        # --- LIMITE DE 1000 REMOVIDO ---
 
         if self.navigable_folders:
             self.current_folder_index = 0
