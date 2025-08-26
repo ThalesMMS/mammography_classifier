@@ -56,7 +56,7 @@ class DataManager:
     def start_buffer_thread(self):
         """Inicia a thread de pré-carregamento em segundo plano."""
         if not self.buffer_thread.is_alive():
-            print("Iniciando thread de pré-carregamento de imagens...")
+            print("Iniciando thread de pré-carregamento de imagens (modo agressivo)...")
             self.buffer_thread.start()
 
     def stop_buffer_thread(self):
@@ -166,15 +166,19 @@ class DataManager:
         """Função da thread para carregar a PRIMEIRA imagem de cada exame no buffer."""
         while not self.buffer_stop_event.is_set():
             if self.current_folder_index < 0:
-                time.sleep(0.5)
+                time.sleep(0.2) # Manteve o sleep menor
                 continue
 
-            indices_to_load = {self.current_folder_index + i for i in range(3) if 0 <= self.current_folder_index + i < len(self.navigable_folders)}
+            # --- MUDANÇA 1: Aumento do Buffer ---
+            # Carrega o exame atual + os 7 próximos (total de 8)
+            buffer_size = 8
+            indices_to_load = {self.current_folder_index + i for i in range(buffer_size) if 0 <= self.current_folder_index + i < len(self.navigable_folders)}
             accessions_to_load = {self.navigable_folders[i] for i in indices_to_load}
 
             for accession in accessions_to_load:
                 if accession not in self.image_buffer:
-                    print(f"[Buffer Thread] Carregando exame: {accession}")
+                    # O print no terminal pode ser um pouco verboso agora, mas é bom para debug
+                    # print(f"[Buffer Thread] Carregando exame: {accession}")
                     dicom_files = self.get_dicom_files(accession)
                     
                     image_data = None
@@ -186,12 +190,15 @@ class DataManager:
                     
                     self.image_buffer[accession] = image_data
 
+            # Limpa do buffer os exames que ficaram para trás
             for accession in list(self.image_buffer.keys()):
                 if accession not in accessions_to_load:
-                    print(f"[Buffer Thread] Descarregando exame: {accession}")
+                    # print(f"[Buffer Thread] Descarregando exame: {accession}")
                     del self.image_buffer[accession]
             
-            time.sleep(0.5)
+            # --- MUDANÇA 2: Thread mais reativa ---
+            # Pausa menor para verificar mais frequentemente se precisa carregar mais exames
+            time.sleep(0.2)
 
     def get_exam_data_from_buffer(self, accession_number: str) -> tuple | None:
         """Obtém os dados da imagem de um exame do buffer."""
