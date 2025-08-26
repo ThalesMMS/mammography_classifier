@@ -28,7 +28,7 @@ class ImageViewerUI:
         self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
         self.fig.canvas.mpl_connect('close_event', self.on_close)
 
-        self.data_manager.start_buffer_thread()
+        self.data_manager.start_loader()
 
         if self.data_manager.get_total_navigable_folders() > 0:
             self.display_current_exam()
@@ -126,7 +126,7 @@ class ImageViewerUI:
     def on_close(self, event):
         """Garante que a thread do buffer seja parada ao fechar a janela."""
         print("Janela fechada. Encerrando a aplicação...")
-        self.data_manager.stop_buffer_thread()
+        self.data_manager.shutdown_loader()
 
     def show(self):
         """Mostra a janela da aplicação."""
