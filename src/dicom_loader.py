@@ -6,10 +6,10 @@ import os
 
 def load_dicom_task(dicom_path, accession_number, shared_buffer):
     """
-    Função 'trabalhadora' projetada para rodar em um processo separado.
-    Carrega um arquivo DICOM e coloca o resultado em um dicionário compartilhado.
+    Função 'trabalhadora' que carrega o DICOM e o processa COMPLETAMENTE,
+    colocando um array uint8 pronto para exibição no buffer compartilhado.
     """
-    image_data = None
+    final_image = None
     try:
         ds = pydicom.dcmread(dicom_path, force=True)
         
@@ -40,18 +40,19 @@ def load_dicom_task(dicom_path, accession_number, shared_buffer):
                 if window_width <= 0: window_width = 1
 
             photometric = ds.PhotometricInterpretation if hasattr(ds, 'PhotometricInterpretation') else "MONOCHROME2"
-            view_params = {"wc": window_center, "ww": window_width, "photometric": photometric}
-            image_data = (pixel_array, view_params)
+            
+            # Executa o processamento final da imagem AQUI, no processo trabalhador
+            final_image = apply_windowing(pixel_array, window_center, window_width, photometric)
 
     except Exception as e:
         print(f"[Processo-{os.getpid()}] Erro ao carregar {os.path.basename(dicom_path)}: {e}")
-        image_data = None # Falha no carregamento
+        final_image = None
     
-    # Coloca o resultado (dados da imagem ou None) no dicionário compartilhado
-    shared_buffer[accession_number] = image_data
+    # Coloca a imagem final (uint8) ou None no dicionário compartilhado
+    shared_buffer[accession_number] = final_image
 
 def apply_windowing(image: np.ndarray, wc: float, ww: float, photometric: str) -> np.ndarray:
-    """Aplica janelamento e retorna imagem uint8. (Função inalterada)"""
+    """Aplica janelamento e retorna imagem uint8."""
     img_min = wc - ww / 2.0
     img_max = wc + ww / 2.0
     
