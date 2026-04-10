@@ -89,8 +89,8 @@ PowerShell
 
     Bash
 
-        git clone <repository_url>
-        cd <project_name>
+        git clone https://github.com/ThalesMMS/mammography_classifier.git
+        cd mammography_classifier
 
 2. **Create a Virtual Environment:**
 
