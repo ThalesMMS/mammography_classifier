@@ -1,194 +1,179 @@
-# Ferramenta de Classificação de Densidade Mamária
+# Breast Density Classification Tool
 
-Esta é uma aplicação Python desenvolvida para auxiliar na classificação de densidade de exames de mamografia. A ferramenta exibe todas as imagens DICOM de um exame simultaneamente em um grid, permitindo que o usuário classifique o exame de forma rápida e eficiente usando o teclado. As classificações são salvas em um arquivo `classificacao.csv`.
+This is a Python application designed to help classify breast density in mammography exams. The tool displays all DICOM images from an exam simultaneously in a grid, allowing the user to classify the exam quickly and efficiently using the keyboard. Classifications are saved to a `classificacao.csv` file.
 
-A aplicação é otimizada para agilidade, pré-carregando os exames seguintes em segundo plano para eliminar o tempo de espera.
+The application is optimized for speed by preloading upcoming exams in the background to eliminate waiting time.
 
-## Como Rodar
+## How to Run
 
 PowerShell
 
-    # Exemplo usando PowerShell
+    # Example using PowerShell
     PS D:\dicom_workplace> .\.venv\Scripts\activate
     (.venv) PS D:\dicom_workplace> python .\src\main.py
-    
 
-## Funcionalidades Principais
+## Main Features
 
-*   **Visualização de Exame Completo:** Carrega e exibe todas as imagens DICOM de um exame simultaneamente em um grid dinâmico.
-    
-*   **Classificação por Teclado:** Permite ao usuário classificar a densidade do exame usando as teclas numéricas de 1 a 4.
-    
-*   **Navegação Ágil:**
-    
-    *   Avança automaticamente para o próximo exame após uma classificação ser feita.
-        
-    *   Permite navegação manual entre exames com as setas (Cima/Baixo).
-        
-*   **Registro de Classificações:** Salva cada classificação em um arquivo `classificacao.csv` na raiz do projeto, contendo o identificador do exame (`AccessionNumber`), a classe e a data/hora da classificação.
-    
-*   **Performance Otimizada:** Utiliza um sistema de pré-carregamento (*pre-loading*) para manter os próximos exames em memória, garantindo uma transição instantânea entre os casos.
-    
-*   **Feedback Visual:** Exibe na tela o identificador do exame atual e informa se ele já foi classificado anteriormente.
-    
-*   **Opções de Inicialização (via console):**
-    
-    1.  **Backup das Classificações:** Opção para fazer backup do arquivo `classificacao.csv` existente.
-        
-    2.  **Filtro de Navegação:** Opção para exibir apenas os exames que ainda não foram classificados.
-        
+* **Full Exam View:** Loads and displays all DICOM images from an exam simultaneously in a dynamic grid.
 
-## Estrutura do Projeto
+* **Keyboard-Based Classification:** Lets the user classify exam density using the numeric keys 1 through 4.
+
+* **Fast Navigation:**
+
+    * Automatically moves to the next exam after a classification is made.
+
+    * Allows manual navigation between exams with the Up/Down arrow keys.
+
+* **Classification Logging:** Saves each classification to a `classificacao.csv` file at the project root, containing the exam identifier (`AccessionNumber`), the class, and the classification date/time.
+
+* **Optimized Performance:** Uses a preloading system to keep upcoming exams in memory, ensuring instant transitions between cases.
+
+* **Visual Feedback:** Displays the current exam identifier on screen and indicates whether it has already been classified.
+
+* **Startup Options (via console):**
+
+    1. **Classification Backup:** Option to back up the existing `classificacao.csv` file.
+
+    2. **Navigation Filter:** Option to display only exams that have not yet been classified.
+
+## Project Structure
 
     dicom_workplace/
     │
-    ├── archive/                     # Contém as subpastas de exames DICOM e train.csv
+    ├── archive/                     # Contains the DICOM exam subfolders and train.csv
     │   ├── 002000/
     │   │   ├── imagem1.dcm
     │   │   └── ...
     │   ├── ...
     │   └── train.csv
     │
-    ├── backups/                     # Criado para backups do classificacao.csv
+    ├── backups/                     # Created for classificacao.csv backups
     │   └── backup_classificacao_YYYYMMDD_HHMMSS/
     │       └── classificacao.csv
     │
-    ├── src/                         # Código fonte da aplicação
-    │   ├── main.py                  # Ponto de entrada principal
-    │   ├── ui_viewer.py             # Interface gráfica do usuário (grid de visualização)
-    │   ├── data_manager.py          # Lógica de dados, classificação e buffer de pré-carregamento
-    │   ├── dicom_loader.py          # Carregador e processador de imagens DICOM
-    │   └── utils.py                 # Funções utilitárias (backup)
+    ├── src/                         # Application source code
+    │   ├── main.py                  # Main entry point
+    │   ├── ui_viewer.py             # Graphical user interface (viewing grid)
+    │   ├── data_manager.py          # Data logic, classification, and preload buffer
+    │   ├── dicom_loader.py          # DICOM image loader and processor
+    │   └── utils.py                 # Utility functions (backup)
     │
-    ├── .gitignore                   # Arquivos ignorados pelo Git
-    ├── requirements.txt             # Dependências Python
-    ├── classificacao.csv            # Arquivo de saída gerado com as classificações
-    └── README.md                    # Este arquivo
-    
+    ├── .gitignore                   # Files ignored by Git
+    ├── requirements.txt             # Python dependencies
+    ├── classificacao.csv            # Output file generated with classifications
+    └── README.md                    # This file
 
-## Pré-requisitos
+## Prerequisites
 
-*   Python (recomendado: 3.9 ou superior)
-    
-*   Bibliotecas listadas em `requirements.txt`. As principais são:
-    
-    *   `pandas`
-        
-    *   `pydicom`
-        
-    *   `matplotlib`
-        
-    *   `numpy`
-        
-*   Para descompressão de certos arquivos DICOM (ex: JPEG Lossless):
-    
-    *   `pylibjpeg`
-        
-    *   `pylibjpeg-libjpeg`
-        
+* Python (recommended: 3.9 or later)
 
-## Configuração do Ambiente
+* Libraries listed in `requirements.txt`. The main ones are:
 
-1.  **Clone o Repositório (se estiver no Git):**
-    
+    * `pandas`
+
+    * `pydicom`
+
+    * `matplotlib`
+
+    * `numpy`
+
+* For decompression of certain DICOM files (for example, JPEG Lossless):
+
+    * `pylibjpeg`
+
+    * `pylibjpeg-libjpeg`
+
+## Environment Setup
+
+1. **Clone the Repository (if using Git):**
+
     Bash
-    
-        git clone <url_do_repositorio>
-        cd <nome_do_projeto>
-        
-    
-2.  **Crie um Ambiente Virtual:**
-    
+
+        git clone https://github.com/ThalesMMS/mammography_classifier.git
+        cd mammography_classifier
+
+2. **Create a Virtual Environment:**
+
     Bash
-    
+
         python -m venv .venv
-        
-    
-3.  **Ative o Ambiente Virtual:**
-    
-    *   Windows (PowerShell):
-        
+
+3. **Activate the Virtual Environment:**
+
+    * Windows (PowerShell):
+
         PowerShell
-        
+
             .venv\Scripts\Activate.ps1
-            
-        
-    *   Linux/macOS:
-        
+
+    * Linux/macOS:
+
         Bash
-        
+
             source .venv/bin/activate
-            
-        
-4.  **Instale as Dependências:**
-    
+
+4. **Install the Dependencies:**
+
     Bash
-    
+
         pip install -r requirements.txt
-        
-    
-    Para garantir a capacidade de lidar com DICOMs comprimidos, instale também:
-    
+
+    To ensure support for compressed DICOM files, also install:
+
     Bash
-    
+
         pip install pylibjpeg pylibjpeg-libjpeg
-        
-    
-5.  **Prepare os Dados:**
-    
-    *   Certifique-se de que a pasta `archive/` existe na raiz do projeto.
-        
-    *   Dentro de `archive/`, coloque as subpastas dos exames (nomeadas com `AccessionNumber`).
-        
-    *   O arquivo `train.csv` deve estar presente dentro da pasta `archive/` para identificar os exames válidos.
-        
 
-## Como Executar a Aplicação
+5. **Prepare the Data:**
 
-1.  Certifique-se de que o ambiente virtual está ativo.
-    
-2.  Execute o script `main.py` a partir da raiz do projeto:
-    
+    * Make sure the `archive/` folder exists at the project root.
+
+    * Inside `archive/`, place the exam subfolders (named with the `AccessionNumber`).
+
+    * The `train.csv` file must be present inside the `archive/` folder to identify valid exams.
+
+## How to Run the Application
+
+1. Make sure the virtual environment is active.
+
+2. Run the `main.py` script from the project root:
+
     Bash
-    
+
         python src/main.py
-        
-    
-3.  Responda às perguntas de configuração inicial que aparecerão no console.
-    
 
-## Instruções de Uso (Teclas de Atalho)
+3. Answer the initial setup questions shown in the console.
 
-*   **Teclas `1`, `2`, `3`, `4`:** Classificam o exame atual e avançam para o próximo.
-    
-    *   `1`: Adiposa
-        
-    *   `2`: Predominantemente Adiposa
-        
-    *   `3`: Predominantemente Densa
-        
-    *   `4`: Densa
-        
-*   **Setas Cima/Baixo:** Navegar manualmente para o exame anterior/seguinte. Permite revisar ou corrigir uma classificação.
-    
+## Usage Instructions (Keyboard Shortcuts)
 
-## Solução de Problemas Comuns
+* **Keys `1`, `2`, `3`, `4`:** Classify the current exam and move to the next one.
 
-*   **Erro "Unable to decompress..." ao carregar DICOMs:** Isso geralmente significa que o arquivo DICOM está comprimido e as bibliotecas necessárias para descompressão não estão instaladas. Siga o passo 4 da "Configuração do Ambiente".
-    
-*   **"FileNotFoundError" para `archive` ou `train.csv`:** Verifique se a estrutura de pastas está correta. A aplicação espera que a pasta `archive/` (contendo os exames e o `train.csv`) esteja na raiz do projeto.
-    
+    * `1`: Fatty
 
-## Possíveis Melhorias Futuras
+    * `2`: Predominantly Fatty
 
-*   Implementar zoom e pan na imagem clicada dentro do grid.
-    
-*   Permitir ajuste manual de janelamento (Window Center/Width).
-    
-*   Adicionar uma interface gráfica para as opções de inicialização.
-    
-*   Salvar o estado do último exame visualizado para continuar de onde parou.
-    
-*   Exibir mais metadados do DICOM (ex: tipo de incidência - MLO, CC) em cada subplot.
-    
-*   Adicionar um modo de "revisão" onde a classificação não avança automaticamente.
+    * `3`: Predominantly Dense
+
+    * `4`: Dense
+
+* **Up/Down Arrow Keys:** Manually navigate to the previous/next exam. This allows you to review or correct a classification.
+
+## Common Troubleshooting
+
+* **"Unable to decompress..." error when loading DICOMs:** This usually means the DICOM file is compressed and the required decompression libraries are not installed. Follow step 4 in "Environment Setup."
+
+* **`FileNotFoundError` for `archive` or `train.csv`:** Check whether the folder structure is correct. The application expects the `archive/` folder (containing the exams and `train.csv`) to be at the project root.
+
+## Possible Future Improvements
+
+* Implement zoom and pan on the clicked image inside the grid.
+
+* Allow manual windowing adjustment (Window Center/Width).
+
+* Add a graphical interface for the startup options.
+
+* Save the state of the last viewed exam so work can continue where it left off.
+
+* Display more DICOM metadata (for example, view type - MLO, CC) in each subplot.
+
+* Add a review mode where classification does not advance automatically.
